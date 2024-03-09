@@ -1,0 +1,66 @@
+name: Kernel Porting Workflow
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+    inputs:
+      base_repo:
+        description: 'Base repository URL'
+        required: true
+        default: ''
+      base_branch:
+        description: 'Base repository branch'
+        required: true
+        default: 'master'
+      port_repo:
+        description: 'Port repository URL'
+        required: true
+        default: ''
+      port_branch:
+        description: 'Port repository branch'
+        required: true
+        default: 'master'
+
+jobs:
+  porting:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install Git if not already installed
+        run: sudo apt-get update && sudo apt-get install -y git
+
+      - name: Checkout base repository
+        uses: actions/checkout@v2
+        with:
+          repository: ${{ github.event.inputs.base_repo }}
+          ref: ${{ github.event.inputs.base_branch }}
+          path: base
+      
+      - name: Checkout port repository
+        uses: actions/checkout@v2
+        with:
+          repository: ${{ github.event.inputs.port_repo }}
+          ref: ${{ github.event.inputs.port_branch }}
+          path: port
+
+      - name: Change into port directory
+        run: cd port
+
+      - name: Apply port kernel commits
+        run: |
+          git config --global user.email "plodmrasif@gmail.com"
+          git config --global user.name "maxregnerklos"
+          git format-patch -k --stdout HEAD~1..HEAD | git am -3 --ignore-whitespace
+        working-directory: base
+
+      - name: Create zip file
+        run: zip -r ported_kernel.zip base
+        working-directory: ${{ github.workspace }}
+      
+      - name: Upload zip file
+        uses: actions/upload-artifact@v2
+        with:
+          name: ported-kernel
+          path: ported_kernel.zip
